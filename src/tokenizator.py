@@ -29,9 +29,10 @@ def process_csv_dataset(file_path):
 
     return df
 
-dataset_tokenized = process_csv_dataset(r'data\raw\error_based.csv')
+dataset_tokenized = process_csv_dataset(r'data/raw/error_based.csv')
+dataset_tokenized.to_csv(r'data/tokenized/error_based_tokenized.csv', index=False)
+dataset_tokenized.to_json(r'data/tokenized/error_based_tokenized.json', orient='records', lines=True)
 print(dataset_tokenized[['request/payload', 'tokens']].head())
-
 
 
 
