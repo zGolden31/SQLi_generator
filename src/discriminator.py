@@ -67,8 +67,10 @@ class ConditionalDiscriminator(nn.Module):
         # Poiché è bidirezionale, prendiamo l'ultimo stato della direzione "avanti" e "indietro"
         # Per semplicità, possiamo semplicemente fare la media o prendere l'ultimo elemento di 'out'
         # out[:, -1, :] prende l'ultimo step dell'intera sequenza per ogni elemento del batch.
-        final_state = out[:, -1, :] # Forma: (batch_size, hidden_dim * 2)
-
+        hidden_forward = hidden[-2]  # Ultimo stato della direzione "avanti"
+        hidden_backward = hidden[-1]  # Ultimo stato della direzione "indietro"
+        final_state = torch.cat((hidden_forward, hidden_backward), dim=1)  # Concatenazione dei due stati per ottenere una rappresentazione completa del payload
+        
         # Calcoliamo il punteggio finale (probabilità che il payload sia reale)
         logits = self.fc(final_state)  # (batch_size, 1)
 
