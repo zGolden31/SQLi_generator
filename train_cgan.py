@@ -84,7 +84,7 @@ def train_cgan():
         loss_d.backward()
         d_optimizer.step()
 
-    print("Inizio Fase 3: Addestramento Avversario (Reinforcement Learning)...")
+    print("Inizio Addestramento Avversario (Reinforcement Learning)...")
     for epoch in range(epochs):
         
         # --- A. Aggiorniamo il Generatore (Policy Gradient) ---
