@@ -67,3 +67,42 @@ class ConditionalGenerator(nn.Module):
         logits = self.fc(out)  # (batch_size, seq_len, vocab_size)
 
         return logits, hidden
+    
+    def sample(self, batch_size, start_token_id, labels, max_seq_len):
+        """
+        Metodo per generare (campionare) nuovi payload da zero.
+        Il generatore parte dal token iniziale e genera un token alla volta.
+        """
+        # Creazione del primo input: una colonna piena del token iniziale
+        inputs = torch.LongTensor(batch_size, 1).fill_(start_token_id).to(labels.device)  # (batch_size, 1)
+
+        # Se c'è una GPU disponibile, spostiamo il modello e i tensori su di essa
+        if next(self.parameters()).is_cuda:
+            inputs = inputs.cuda()
+            labels = labels.cuda()
+
+        hidden = None # Stato nascosto iniziale
+        samples = [] # Lista per memorizzare i token generati
+
+        for _ in range(max_seq_len):
+            # Passiamo il token attuale e l'etichetta attraverso la rete
+            logits, hidden = self.forward(inputs, labels, hidden)  # logits: (batch_size, 1, vocab_size)
+
+            # Estraiamo l'output per l'ultimo token calcolato
+            logits = logits[:, -1, :]  # (batch_size, vocab_size)
+
+            # Convertiamo i punteggi in probabilità usando softmax
+            probs = F.softmax(logits, dim=-1)  # (batch_size, vocab_size)
+
+            # Campioniamo il token successivo in base alle probabilità
+            next_token = torch.multinomial(probs, 1)  # (batch_size, 1)   
+
+            # Aggiungiamo il token campionato alla nostra lista
+            samples.append(next_token)
+
+            # Il token campionato diventa l'input per il prossimo passo
+            inputs = next_token
+
+        # uniamo tutti i token generati in un unico tensore
+        samples = torch.cat(samples, dim=1)  # (batch_size, max_seq_len)
+        return samples    
