@@ -34,3 +34,36 @@ class ConditionalGenerator(nn.Module):
         # Mappa l'output della LSTM (hidden_dim) alla dimensione del vocabolario
         # Serve per calcolare la probabiltà del token successivo da generare.
         self.fc = nn.Linear(hidden_dim, vocab_size)
+
+    def forward(self, x, labels, hidden=None):
+        """
+        Passaggio in avanti (forward pass) del modello.
+        Usato durante il pre-training Maximum Likelihood Estimation (MLE).
+
+        Parametri:
+        - x: Tensore dei token di input (batch_size, seq_len) - sequenza di token SQL codificati come ID interi
+        - labels: Tensore delle etichette condizionali (batch_size, 1) - ad esempio, 0 per 'ok', 1 per 'error', 2 per 'fail'
+        - hidden: Stato nascosto iniziale per la LSTM 
+        """
+        batch_size, seq_len = x.size()
+
+        # Otteniamo la rappresentazione vettoriale dei token SQL
+        emb_x = self.token_embedding(x)  # (batch_size, seq_len, embed_dim)
+
+        # Otteniamo la rappresentazione vettoriale delle etichette condizionali
+        emb_label = self.label_embedding(labels)  # (batch_size, 1, embed_dim)
+
+        # Espandiamo l'etichetta per tutta la lunghezza della sequenza
+        # Vogliamo che l'LSTM ricordi la condizione ad ogni singolo token che processa
+        emb_label = emb_label.expand(batch_size, seq_len, -1)  # (batch_size, seq_len, embed_dim)
+
+        # Concatenazione del token con l'etichetta
+        lstm_input = torch.cat([emb_x,emb_label], dim=2)  # (batch_size, seq_len, embed_dim * 2)
+
+        # Passare i dati nell'LSTM
+        out, hidden = self.lstm(lstm_input, hidden)  # out: (batch_size, seq_len, hidden_dim)
+
+        # Otteniamo i punteggi finali per ogni token del vocabolario
+        logits = self.fc(out)  # (batch_size, seq_len, vocab_size)
+
+        return logits, hidden
