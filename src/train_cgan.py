@@ -5,6 +5,7 @@ import torch.optim as optim
 # Import dei modelli Generator e Discriminator
 from generator import ConditionalGenerator
 from discriminator import ConditionalDiscriminator
+from dataset_utils import get_dataloader
 
 def train_cgan():
     # --- Configurazione iperparametri ---
@@ -36,99 +37,99 @@ def train_cgan():
     # Per il discriminatore (reale vs falso) sarà binario
     d_loss_fn = nn.BCEWithLogitsLoss()
 
-    # --- SIMULAZIONE DATI ---
-    # TODO: Sostituire con il caricamento dei dati reali
-    # Per ora, generiamo dati casuali per testare il processo di training
-    def get_real_batch():
-        # Dati casuali finti: (batch_size, seq_len)
-        real_data = torch.randint(0, vocab_size, (batch_size, seq_len)).to(device)
-        labels = torch.randint(0, num_classes, (batch_size,)).to(device)
-        return real_data, labels
+    # Caricamento dati
+    csv_file = "data/raw/error_based.csv"
+    tokenizer_json = "data/bpe_config/sql_bpe_tokenizer_config.json"
+
+    print("Caricamento dataset in corso...")
+    dataloader = get_dataloader(
+        csv_file=csv_file, 
+        tokenizer_config_path=tokenizer_json, 
+        batch_size=batch_size, 
+        max_seq_len=seq_len, 
+        label_value=0  # 0 rappresenta 'error_based'
+    )
+
     print("Inizio del pre-training del generatore...")
-    for step in range(100):
-        real_data, labels = get_real_batch()
+    # Facciamo 5 "giri" (epoche) su tutto il dataset reale per fargli imparare la base
+    for pre_epoch in range(5): 
+        for real_data, labels in dataloader:
+            # Spostiamo i dati sulla GPU (se disponibile)
+            real_data, labels = real_data.to(device), labels.to(device)
 
-        g_optimizer.zero_grad()
-        # Per prevedere il token successivo, passiamo tutti i token tranne l'ultimo (input)
-        # e cerchiamo di prevedere tutti i token tranne il primo (target)
-        inputs = real_data[:, :-1]  # (batch_size, seq_len - 1)
-        targets = real_data[:, 1:]  # (batch_size, seq_len - 1)
+            g_optimizer.zero_grad()
+            
+            # Input (dal primo al penultimo) e Target (dal secondo all'ultimo)
+            inputs = real_data[:, :-1]  
+            targets = real_data[:, 1:]  
 
-        logits, _ = generator(inputs, labels)
+            logits, _ = generator(inputs, labels)
 
-        # Rimodelliamo per il calcolo della loss
-        loss = g_pretrain_loss(logits.reshape(-1, vocab_size), targets.reshape(-1))
-        loss.backward()
-        g_optimizer.step()
+            loss = g_pretrain_loss(logits.reshape(-1, vocab_size), targets.reshape(-1))
+            loss.backward()
+            g_optimizer.step()
+        print(f"Pre-training G - Epoca {pre_epoch+1}/5 completata.")
 
-    print("Pre-training del discriminatore...")
-    for step in range(100):
-        real_data, labels = get_real_batch()
+    print("Inizio del pre-training del discriminatore...")
+    for pre_epoch in range(5):
+        for real_data, labels in dataloader:
+            real_data, labels = real_data.to(device), labels.to(device)
 
-        # --- Addestramento del Discriminatore ---
-        d_optimizer.zero_grad()
+            d_optimizer.zero_grad()
 
-        # Dati reali
-        real_labels = torch.ones(batch_size, 1).to(device)  # Etichetta 1 per dati reali
-        real_targets = torch.ones_like(real_logits) # 1 = Reale
-        loss_real = d_loss_fn(real_logits, real_targets)
+            # --- Dati reali ---
+            # QUI IL FIX: Prima calcoliamo le predizioni sui dati veri!
+            real_logits = discriminator(real_data, labels) 
+            real_targets = torch.ones_like(real_logits) # 1 = Reale
+            loss_real = d_loss_fn(real_logits, real_targets)
 
-        # Dati generati
-        fake_data = generator.sample(batch_size, start_token_id=2, labels=labels, max_seq_len=seq_len)
-        fake_logits = discriminator(fake_data.detach(), labels) # detach() stacca i gradienti del generatore
-        fake_targets = torch.zeros_like(fake_logits) # 0 = Falso
-        loss_fake = d_loss_fn(fake_logits, fake_targets)
-        
-        # Loss totale del discriminatore
-        loss_d = loss_real + loss_fake
-        loss_d.backward()
-        d_optimizer.step()
+            # --- Dati generati ---
+            fake_data = generator.sample(batch_size, start_token_id=2, labels=labels, max_seq_len=seq_len)
+            fake_logits = discriminator(fake_data.detach(), labels) 
+            fake_targets = torch.zeros_like(fake_logits) # 0 = Falso
+            loss_fake = d_loss_fn(fake_logits, fake_targets)
+            
+            # Loss totale
+            loss_d = loss_real + loss_fake
+            loss_d.backward()
+            d_optimizer.step()
+        print(f"Pre-training D - Epoca {pre_epoch+1}/5 completata.")
 
     print("Inizio Addestramento Avversario (Reinforcement Learning)...")
     for epoch in range(epochs):
-        
-        # --- A. Aggiorniamo il Generatore (Policy Gradient) ---
-        g_optimizer.zero_grad()
-        _, labels = get_real_batch()
-        
-        # Il generatore crea un payload
-        fake_data = generator.sample(batch_size, start_token_id=2, labels=labels, max_seq_len=seq_len)
-        
-        # Il discriminatore lo valuta (ci dà il "Reward" o Ricompensa)
-        # Sigmoid trasforma i logits grezzi in una percentuale da 0 a 1 (1 = Discriminatore Ingannato)
-        reward = torch.sigmoid(discriminator(fake_data, labels)).detach() 
-        
-        # Per calcolare la loss del generatore col Reinforcement Learning (REINFORCE),
-        # ci servono le probabilità che il generatore aveva assegnato ai token che ha scelto.
-        logits, _ = generator(fake_data, labels) 
-        log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
-        
-        # Estraiamo le probabilità solo dei token effettivamente campionati
-        chosen_log_probs = log_probs.gather(2, fake_data.unsqueeze(2)).squeeze(2)
-        
-        # Formula semplificata di Policy Gradient: Loss = - (Ricompensa * Probabilità delle azioni)
-        # Se la ricompensa è alta, la loss diventa molto negativa, incoraggiando queste azioni.
-        # Calcoliamo la media su tutta la frase e su tutto il batch
-        g_loss = - (reward.unsqueeze(1) * chosen_log_probs).mean()
-        
-        g_loss.backward()
-        g_optimizer.step()
-        
-        # --- B. Aggiorniamo il Discriminatore ---
-        d_optimizer.zero_grad()
-        real_data, _ = get_real_batch()
-        
-        # Ricalcoliamo le predizioni sui nuovi payload
-        real_logits = discriminator(real_data, labels)
-        fake_logits = discriminator(fake_data.detach(), labels)
-        
-        loss_d = d_loss_fn(real_logits, torch.ones_like(real_logits)) + \
-                 d_loss_fn(fake_logits, torch.zeros_like(fake_logits))
-        
-        loss_d.backward()
-        d_optimizer.step()
-        
-        if epoch % 10 == 0:
+        # Invece di un solo batch casuale, passiamo attraverso tutti i batch reali
+        for batch_idx, (real_data, labels) in enumerate(dataloader):
+            real_data, labels = real_data.to(device), labels.to(device)
+            
+            # --- A. Aggiorniamo il Generatore (Policy Gradient) ---
+            g_optimizer.zero_grad()
+            
+            fake_data = generator.sample(batch_size, start_token_id=2, labels=labels, max_seq_len=seq_len)
+            reward = torch.sigmoid(discriminator(fake_data, labels)).detach() 
+            
+            logits, _ = generator(fake_data, labels) 
+            log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
+            chosen_log_probs = log_probs.gather(2, fake_data.unsqueeze(2)).squeeze(2)
+            
+            g_loss = - (reward.unsqueeze(1) * chosen_log_probs).mean()
+            
+            g_loss.backward()
+            g_optimizer.step()
+            
+            # --- B. Aggiorniamo il Discriminatore ---
+            d_optimizer.zero_grad()
+            
+            real_logits = discriminator(real_data, labels)
+            fake_logits = discriminator(fake_data.detach(), labels)
+            
+            loss_d = d_loss_fn(real_logits, torch.ones_like(real_logits)) + \
+                     d_loss_fn(fake_logits, torch.zeros_like(fake_logits))
+            
+            loss_d.backward()
+            d_optimizer.step()
+            
+        # Stampiamo i risultati solo alla fine di ogni intera "epoca" (non per ogni batch)
+        if epoch % 5 == 0 or epoch == epochs - 1:
             print(f"Epoch {epoch}/{epochs} | G Loss: {g_loss.item():.4f} | D Loss: {loss_d.item():.4f}")
 
 if __name__ == "__main__":
