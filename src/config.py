@@ -16,6 +16,7 @@ TOKENIZED_OUTPUT = str(DATA_DIR / "tokenized" / "error_based_tokenized.csv")
 GENERATOR_MODEL = str(MODELS_DIR / "generator_model.pth")
 DISCRIMINATOR_MODEL = str(MODELS_DIR / "discriminator_model.pth")
 
+
 # Crea le directory
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -34,11 +35,11 @@ START_TOKEN = 2 # Per indicare l'inizio di una sequenza (usato durante la genera
 # ==================== TRAINING ====================
 BATCH_SIZE = 32 
 MAX_SEQ_LEN = 50 # Lunghezza massima delle sequenze (può essere regolata in base alla distribuzione dei dati)
-EPOCHS = 50
-PRETRAIN_EPOCHS = 100
+EPOCHS = 100
+PRETRAIN_EPOCHS = 10
 
 LEARNING_RATE_G = 0.0005  # Ridotto per maggiore stabilità con la capacità del modello aumentata
-LEARNING_RATE_D = 0.0005
+LEARNING_RATE_D = 0.0001
 
 GRAD_CLIP = 5.0
 
