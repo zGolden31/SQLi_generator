@@ -33,7 +33,7 @@ def train_cgan():
 
     # Loss function
     # Per il pre-training del generatore (prevedere il token esatto)
-    g_pretrain_loss = nn.CrossEntropyLoss()
+    g_pretrain_loss = nn.CrossEntropyLoss(ignore_index=0)
     # Per il discriminatore (reale vs falso) sarà binario
     d_loss_fn = nn.BCEWithLogitsLoss()
 
