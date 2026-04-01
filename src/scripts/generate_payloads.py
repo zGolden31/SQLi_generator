@@ -1,6 +1,6 @@
 import torch
 from tokenizers import Tokenizer
-from generator import ConditionalGenerator
+from models.generator import ConditionalGenerator
 from config import (
     VOCAB_SIZE, EMBED_DIM, HIDDEN_DIM, NUM_CLASSES,
     GENERATOR_MODEL, TOKENIZER_CONFIG, 

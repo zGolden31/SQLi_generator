@@ -4,6 +4,7 @@ import pandas as pd
 from tokenizers import Tokenizer
 from config import PAD_TOKEN, START_TOKEN
 
+
 class SQLiDataset(Dataset):
     def __init__(self, csv_file, tokenizer_config_path, max_seq_len=50, label_value=0):
         """
