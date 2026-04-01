@@ -27,13 +27,13 @@ HIDDEN_DIM = 128
 NUM_CLASSES = 3
 
 # Token speciali
-PAD_TOKEN = 0
-START_TOKEN = 2
+PAD_TOKEN = 0 # Per il padding (se necessario)
+START_TOKEN = 2 # Per indicare l'inizio di una sequenza (usato durante la generazione)
 
 
 # ==================== TRAINING ====================
-BATCH_SIZE = 32
-MAX_SEQ_LEN = 50
+BATCH_SIZE = 32 
+MAX_SEQ_LEN = 50 # Lunghezza massima delle sequenze (può essere regolata in base alla distribuzione dei dati)
 EPOCHS = 50
 PRETRAIN_EPOCHS = 10
 
