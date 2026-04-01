@@ -2,7 +2,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from config import *
+from config import (
+    VOCAB_SIZE, EMBED_DIM, HIDDEN_DIM, NUM_CLASSES,
+    GENERATOR_MODEL, DISCRIMINATOR_MODEL, TOKENIZER_CONFIG,
+    CSV_FILE, BATCH_SIZE, MAX_SEQ_LEN, EPOCHS, PRETRAIN_EPOCHS,
+    LEARNING_RATE_G, LEARNING_RATE_D, START_TOKEN, GRAD_CLIP
+)
 
 # Import dei modelli Generator e Discriminator
 from generator import ConditionalGenerator
@@ -28,10 +33,6 @@ def train_cgan():
     g_pretrain_loss = nn.CrossEntropyLoss(ignore_index=0)
     # Per il discriminatore (reale vs falso) sarà binario
     d_loss_fn = nn.BCEWithLogitsLoss()
-
-    # Caricamento dati
-    csv_file = "data/raw/error_based.csv"
-    tokenizer_json = "data/bpe_config/sql_bpe_tokenizer_config.json"
 
     print("Caricamento dataset in corso...")
     dataloader = get_dataloader(
@@ -59,6 +60,7 @@ def train_cgan():
 
             loss = g_pretrain_loss(logits.reshape(-1, VOCAB_SIZE), targets.reshape(-1))
             loss.backward()
+            nn.utils.clip_grad_norm_(generator.parameters(), GRAD_CLIP)
             g_optimizer.step()
         print(f"Pre-training G - Epoca {pre_epoch+1}/{PRETRAIN_EPOCHS} completata.")
 
@@ -84,6 +86,7 @@ def train_cgan():
             # Loss totale
             loss_d = loss_real + loss_fake
             loss_d.backward()
+            nn.utils.clip_grad_norm_(discriminator.parameters(), GRAD_CLIP)
             d_optimizer.step()
         print(f"Pre-training D - Epoca {pre_epoch+1}/{PRETRAIN_EPOCHS} completata.")
 
@@ -108,15 +111,11 @@ def train_cgan():
             logits, _ = generator(pg_inputs, labels)
             log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
             chosen_log_probs = log_probs.gather(2, fake_data.unsqueeze(2)).squeeze(2)
-
-            # Codice vecchio (errato): stava usando i dati reali invece dei dati generati per calcolare le probabilità
-                # logits, _ = generator(fake_data, labels) 
-                # log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
-                # chosen_log_probs = log_probs.gather(2, fake_data.unsqueeze(2)).squeeze(2)
             
             g_loss = - (reward.unsqueeze(1) * chosen_log_probs).mean()
             
             g_loss.backward()
+            nn.utils.clip_grad_norm_(generator.parameters(), GRAD_CLIP)
             g_optimizer.step()
             
             # --- B. Aggiorniamo il Discriminatore ---
@@ -129,6 +128,7 @@ def train_cgan():
                      d_loss_fn(fake_logits, torch.zeros_like(fake_logits))
             
             loss_d.backward()
+            nn.utils.clip_grad_norm_(discriminator.parameters(), GRAD_CLIP)
             d_optimizer.step()
             
         # Stampiamo i risultati solo alla fine di ogni intera "epoca" (non per ogni batch)
@@ -138,8 +138,8 @@ def train_cgan():
         # Salvataggio dei modelli
     
     print("Salvataggio dei modelli in corso...")
-    torch.save(generator.state_dict(), "data/models/generator_model.pth")
-    torch.save(discriminator.state_dict(), "data/models/discriminator_model.pth")
+    torch.save(generator.state_dict(), GENERATOR_MODEL)
+    torch.save(discriminator.state_dict(), DISCRIMINATOR_MODEL)
     print("Addestramento completato e modelli salvati!")
 
 

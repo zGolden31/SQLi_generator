@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from config import GENERATION_TEMPERATURE
 
 class ConditionalGenerator(nn.Module):
     def __init__(self, vocab_size, embed_dim, hidden_dim, num_classes):
@@ -96,8 +97,7 @@ class ConditionalGenerator(nn.Module):
             logits = logits[:, -1, :]  # (batch_size, vocab_size)
 
             # Applichiamo una temperatura per controllare la casualità della generazione
-            temperatura = 0.6
-            logits = logits / temperatura
+            logits = logits / GENERATION_TEMPERATURE
             # Convertiamo i punteggi in probabilità usando softmax
             probs = F.softmax(logits, dim=-1)  # (batch_size, vocab_size)
 
