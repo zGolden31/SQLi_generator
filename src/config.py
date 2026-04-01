@@ -10,10 +10,10 @@ PROJECT_ROOT = Path(__file__).parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 MODELS_DIR = DATA_DIR / "models"
 
-CSV_FILE = DATA_DIR / "raw" / "error_based.csv"
-TOKENIZER_CONFIG = DATA_DIR / "bpe_config" / "sql_bpe_tokenizer_config.json"
-GENERATOR_MODEL = MODELS_DIR / "generator_model.pth"
-DISCRIMINATOR_MODEL = MODELS_DIR / "discriminator_model.pth"
+CSV_FILE = str(DATA_DIR / "raw" / "error_based.csv")
+TOKENIZER_CONFIG = str(DATA_DIR / "bpe_config" / "sql_bpe_tokenizer_config.json")
+GENERATOR_MODEL = str(MODELS_DIR / "generator_model.pth")
+DISCRIMINATOR_MODEL = str(MODELS_DIR / "discriminator_model.pth")
 
 # Crea le directory
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
