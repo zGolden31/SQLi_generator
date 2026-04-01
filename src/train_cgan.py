@@ -1,6 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import sys
+from pathlib import Path
+
+# Permette l'esecuzione diretta del file (python src/training/train_cgan.py)
+SRC_DIR = Path(__file__).resolve().parents[1]
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 from config import (
     VOCAB_SIZE, EMBED_DIM, HIDDEN_DIM, NUM_CLASSES,
@@ -10,9 +17,9 @@ from config import (
 )
 
 # Import dei modelli Generator e Discriminator
-from models.generator import ConditionalGenerator
-from models.discriminator import ConditionalDiscriminator
-from data.dataset_loader import get_dataloader
+from generator import ConditionalGenerator
+from discriminator import ConditionalDiscriminator
+from dataset_loader import get_dataloader
 
 def train_cgan():
     # --- Inizializzazione dei modelli ---
