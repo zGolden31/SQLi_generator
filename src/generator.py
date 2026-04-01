@@ -54,9 +54,9 @@ class ConditionalGenerator(nn.Module):
         emb_label = self.label_embedding(labels)  # (batch_size, 1, embed_dim)
 
         # Assicuriamoci che labels abbia una dimensione aggiuntiva per l'espansione
-        if labels.dim() == 1:
-            labels = labels.unsqueeze(1) # Da (batch_size,) diventa (batch_size, 1)
-            
+        if emb_label.dim() == 2:
+            emb_label = emb_label.unsqueeze(1)  # (batch_size, 1, embed_dim)
+
         # Espandiamo l'etichetta per tutta la lunghezza della sequenza
         # Vogliamo che l'LSTM ricordi la condizione ad ogni singolo token che processa
         emb_label = emb_label.expand(batch_size, seq_len, -1)  # (batch_size, seq_len, embed_dim)
