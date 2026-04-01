@@ -16,7 +16,7 @@ def train_cgan():
 
     batch_size = 32
     seq_len = 50 # Lunghezza massima dei payload SQL (può essere adattata in base ai dati)
-    epochs = 50
+    epochs = 250
 
     # --- Inizializzazione dei modelli ---
     generator = ConditionalGenerator(vocab_size, embed_dim, hidden_dim, num_classes)
@@ -52,7 +52,7 @@ def train_cgan():
 
     print("Inizio del pre-training del generatore...")
     # Facciamo 5 "giri" (epoche) su tutto il dataset reale per fargli imparare la base
-    for pre_epoch in range(5): 
+    for pre_epoch in range(epochs): 
         for real_data, labels in dataloader:
             # Spostiamo i dati sulla GPU (se disponibile)
             real_data, labels = real_data.to(device), labels.to(device)
@@ -68,10 +68,10 @@ def train_cgan():
             loss = g_pretrain_loss(logits.reshape(-1, vocab_size), targets.reshape(-1))
             loss.backward()
             g_optimizer.step()
-        print(f"Pre-training G - Epoca {pre_epoch+1}/5 completata.")
+        print(f"Pre-training G - Epoca {pre_epoch+1}/{epochs} completata.")
 
     print("Inizio del pre-training del discriminatore...")
-    for pre_epoch in range(5):
+    for pre_epoch in range(epochs):
         for real_data, labels in dataloader:
             real_data, labels = real_data.to(device), labels.to(device)
 
@@ -93,7 +93,7 @@ def train_cgan():
             loss_d = loss_real + loss_fake
             loss_d.backward()
             d_optimizer.step()
-        print(f"Pre-training D - Epoca {pre_epoch+1}/5 completata.")
+        print(f"Pre-training D - Epoca {pre_epoch+1}/{epochs} completata.")
 
     print("Inizio Addestramento Avversario (Reinforcement Learning)...")
     for epoch in range(epochs):
