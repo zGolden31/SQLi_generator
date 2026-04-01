@@ -12,7 +12,7 @@ from config import (
 # Import dei modelli Generator e Discriminator
 from models.generator import ConditionalGenerator
 from models.discriminator import ConditionalDiscriminator
-from dataset_utils import get_dataloader
+from data.dataset_loader import get_dataloader
 
 def train_cgan():
     # --- Inizializzazione dei modelli ---

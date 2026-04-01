@@ -10,9 +10,9 @@ from config import (
 
 def generate_payloads(num_samples=None, label_type=None, max_seq_len=None):
     # Configurazione dei parametri del modello
-    num_samples = num_samples or NUM_SAMPLES
-    label_type = label_type or GENERATION_LABEL_TYPE
-    max_seq_len = max_seq_len or MAX_SEQ_LEN
+    num_samples = NUM_SAMPLES if num_samples is None else num_samples
+    label_type = GENERATION_LABEL_TYPE if label_type is None else label_type
+    max_seq_len = MAX_SEQ_LEN if max_seq_len is None else max_seq_len
 
     # Percorsi dei file
     model_path = GENERATOR_MODEL

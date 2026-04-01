@@ -1,6 +1,8 @@
 import pandas as pd
 import re
-from config import CSV_FILE, TOKENIZED_OUTPUT
+from tokenizers import Tokenizer, models, trainers, pre_tokenizers, normalizers
+
+from config import CSV_FILE, TOKENIZED_OUTPUT, BPE_VOCAB_SIZE, BPE_MIN_FREQUENCY, BPE_OUTPUT
 
 def tokenize_sqli(payload):
     # Regole di tokenizzazione per SQLi
@@ -29,16 +31,6 @@ def process_csv_dataset(file_path):
     df['tokens'] = df['request/payload'].apply(tokenize_sqli)
 
     return df
-
-dataset_tokenized = process_csv_dataset(CSV_FILE)
-dataset_tokenized.to_csv(TOKENIZED_OUTPUT, index=False)
-print(f"Dataset tokenizzato salvato in {TOKENIZED_OUTPUT}")
-dataset_tokenized.to_json(TOKENIZED_OUTPUT.replace('.csv', '.json'), orient='records', lines=True)
-print(dataset_tokenized[['request/payload', 'tokens']].head())
-
-import pandas as pd
-from tokenizers import Tokenizer, models, trainers, pre_tokenizers, normalizers
-from config import CSV_FILE, BPE_VOCAB_SIZE, BPE_MIN_FREQUENCY, BPE_OUTPUT
 
 def train_bpe_tokenizer(data_path, output_path="data/bpe_config/sql_bpe_tokenizer_config.json"):
     # Usiamo un token [UNK] per gestire i token non visti durante l'addestramento
@@ -82,9 +74,22 @@ def train_bpe_tokenizer(data_path, output_path="data/bpe_config/sql_bpe_tokenize
 
     return tokenizer
 
-# Esempio di utilizzo
-data_file = CSV_FILE
-train_bpe_tokenizer(data_file, BPE_OUTPUT)
+def run_tokenization_pipeline(csv_path=CSV_FILE, tokenized_output=TOKENIZED_OUTPUT):
+    dataset_tokenized = process_csv_dataset(csv_path)
+    dataset_tokenized.to_csv(tokenized_output, index=False)
+    print(f"Dataset tokenizzato salvato in {tokenized_output}")
+    dataset_tokenized.to_json(tokenized_output.replace('.csv', '.json'), orient='records', lines=True)
+    print(dataset_tokenized[['request/payload', 'tokens']].head())
+    return dataset_tokenized
+
+
+def main():
+    run_tokenization_pipeline(CSV_FILE, TOKENIZED_OUTPUT)
+    train_bpe_tokenizer(CSV_FILE, BPE_OUTPUT)
+
+
+if __name__ == "__main__":
+    main()
 
 
 
