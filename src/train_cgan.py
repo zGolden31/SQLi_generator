@@ -107,9 +107,20 @@ def train_cgan():
             fake_data = generator.sample(batch_size, start_token_id=2, labels=labels, max_seq_len=seq_len)
             reward = torch.sigmoid(discriminator(fake_data, labels)).detach() 
             
-            logits, _ = generator(fake_data, labels) 
+            # Fix per il gradiente
+            # Ricreiamo gli input: [CLS] + tutti i fake_data tranne l'ultimo
+            start_tokens = torch.LongTensor(batch_size, 1).fill_(2).to(device)
+            pg_inputs = torch.cat([start_tokens, fake_data[:, :-1]], dim=1)
+
+            # Ora calcoliamo le probabilità: pg_inputs e fake_data (target) sono allineati
+            logits, _ = generator(pg_inputs, labels)
             log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
             chosen_log_probs = log_probs.gather(2, fake_data.unsqueeze(2)).squeeze(2)
+
+            # Codice vecchio (errato): stava usando i dati reali invece dei dati generati per calcolare le probabilità
+                # logits, _ = generator(fake_data, labels) 
+                # log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
+                # chosen_log_probs = log_probs.gather(2, fake_data.unsqueeze(2)).squeeze(2)
             
             g_loss = - (reward.unsqueeze(1) * chosen_log_probs).mean()
             

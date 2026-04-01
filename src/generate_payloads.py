@@ -61,5 +61,6 @@ def generate_payloads(num_samples=5, label_type=0, max_seq_len=50):
         print(testo_decodificato.replace(" ", ""))
         print("-" * 30)
 
+
 if __name__ == "__main__":
     generate_payloads(num_samples=10, label_type=0)

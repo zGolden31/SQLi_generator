@@ -95,6 +95,9 @@ class ConditionalGenerator(nn.Module):
             # Estraiamo l'output per l'ultimo token calcolato
             logits = logits[:, -1, :]  # (batch_size, vocab_size)
 
+            # Applichiamo una temperatura per controllare la casualità della generazione
+            temperatura = 0.8
+            logits = logits / temperatura
             # Convertiamo i punteggi in probabilità usando softmax
             probs = F.softmax(logits, dim=-1)  # (batch_size, vocab_size)
 
