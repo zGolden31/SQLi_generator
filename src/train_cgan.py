@@ -132,5 +132,13 @@ def train_cgan():
         if epoch % 5 == 0 or epoch == epochs - 1:
             print(f"Epoch {epoch}/{epochs} | G Loss: {g_loss.item():.4f} | D Loss: {loss_d.item():.4f}")
 
+        # Salvataggio dei modelli
+    
+    print("Salvataggio dei modelli in corso...")
+    torch.save(generator.state_dict(), "data/models/generator_model.pth")
+    torch.save(discriminator.state_dict(), "data/models/discriminator_model.pth")
+    print("Addestramento completato e modelli salvati!")
+
+
 if __name__ == "__main__":
     train_cgan()
