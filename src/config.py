@@ -22,8 +22,8 @@ MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ==================== MODEL ====================
 VOCAB_SIZE = 379
-EMBED_DIM = 64
-HIDDEN_DIM = 128
+EMBED_DIM = 128
+HIDDEN_DIM = 256
 NUM_CLASSES = 3
 
 # Token speciali
@@ -35,10 +35,12 @@ START_TOKEN = 2 # Per indicare l'inizio di una sequenza (usato durante la genera
 BATCH_SIZE = 32 
 MAX_SEQ_LEN = 50 # Lunghezza massima delle sequenze (può essere regolata in base alla distribuzione dei dati)
 EPOCHS = 50
-PRETRAIN_EPOCHS = 10
+PRETRAIN_EPOCHS = 100
 
-LEARNING_RATE_G = 0.001
-LEARNING_RATE_D = 0.001
+LEARNING_RATE_G = 0.0005  # Ridotto per maggiore stabilità con la capacità del modello aumentata
+LEARNING_RATE_D = 0.0005
+
+GRAD_CLIP = 5.0
 
 USE_CUDA = True
 
@@ -50,6 +52,7 @@ DROP_LAST_BATCH = True
 # ==================== GENERATION ====================
 NUM_SAMPLES = 10
 GENERATION_LABEL_TYPE = 0  # 0=error_based, 1=time_based, 2=union_based
+GENERATION_TEMPERATURE = 0.8  # Temperatura di campionamento (più basso = più deterministico)
 
 # ==================== BPE TOKENIZER ====================
 BPE_VOCAB_SIZE = 5000
