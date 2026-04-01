@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 from tokenizers import Tokenizer
+from config import PAD_TOKEN, START_TOKEN
 
 class SQLiDataset(Dataset):
     def __init__(self, csv_file, tokenizer_config_path, max_seq_len=50, label_value=0):
@@ -49,7 +50,7 @@ class SQLiDataset(Dataset):
         
         # 2. Aggiungiamo il token [CLS] all'inizio (ID 2 nel tuo JSON)
         # Questo serve al Generatore per capire dove inizia la frase
-        token_ids = [2] + token_ids
+        token_ids = [START_TOKEN] + token_ids
         
         # 3. Troncamento o Padding
         # Le reti neurali vogliono sequenze tutte della stessa lunghezza!
@@ -59,7 +60,7 @@ class SQLiDataset(Dataset):
         else:
             # Se è troppo corto, aggiungiamo il token [PAD] (ID 0 nel tuo JSON) alla fine
             padding_length = self.max_seq_len - len(token_ids)
-            token_ids = token_ids + [0] * padding_length
+            token_ids = token_ids + [PAD_TOKEN] * padding_length
             
         # 4. Convertiamo in Tensori PyTorch
         x_tensor = torch.tensor(token_ids, dtype=torch.long)
