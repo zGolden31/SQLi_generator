@@ -12,6 +12,7 @@ MODELS_DIR = DATA_DIR / "models"
 
 CSV_FILE = str(DATA_DIR / "raw" / "error_based.csv")
 TOKENIZER_CONFIG = str(DATA_DIR / "bpe_config" / "sql_bpe_tokenizer_config.json")
+TOKENIZED_OUTPUT = str(DATA_DIR / "tokenized" / "error_based_tokenized.csv")
 GENERATOR_MODEL = str(MODELS_DIR / "generator_model.pth")
 DISCRIMINATOR_MODEL = str(MODELS_DIR / "discriminator_model.pth")
 
@@ -45,3 +46,12 @@ USE_CUDA = True
 # ==================== DATA ====================
 SHUFFLE = True
 DROP_LAST_BATCH = True
+
+# ==================== GENERATION ====================
+NUM_SAMPLES = 10
+GENERATION_LABEL_TYPE = 0  # 0=error_based, 1=time_based, 2=union_based
+
+# ==================== BPE TOKENIZER ====================
+BPE_VOCAB_SIZE = 5000
+BPE_MIN_FREQUENCY = 2
+BPE_OUTPUT = str(DATA_DIR / "bpe_config" / "sql_bpe_tokenizer_config.json")

@@ -1,5 +1,6 @@
 import pandas as pd
 import re
+from config import CSV_FILE, TOKENIZED_OUTPUT
 
 def tokenize_sqli(payload):
     # Regole di tokenizzazione per SQLi
@@ -29,10 +30,10 @@ def process_csv_dataset(file_path):
 
     return df
 
-dataset_tokenized = process_csv_dataset(r'data/raw/error_based.csv')
-dataset_tokenized.to_csv(r'data/tokenized/error_based_tokenized.csv', index=False)
-print("Dataset tokenizzato salvato in data/tokenized/error_based_tokenized.csv")
-dataset_tokenized.to_json(r'data/tokenized/error_based_tokenized.json', orient='records', lines=True)
+dataset_tokenized = process_csv_dataset(CSV_FILE)
+dataset_tokenized.to_csv(TOKENIZED_OUTPUT, index=False)
+print(f"Dataset tokenizzato salvato in {TOKENIZED_OUTPUT}")
+dataset_tokenized.to_json(TOKENIZED_OUTPUT.replace('.csv', '.json'), orient='records', lines=True)
 print(dataset_tokenized[['request/payload', 'tokens']].head())
 
 

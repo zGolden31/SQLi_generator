@@ -1,17 +1,22 @@
 import torch
 from tokenizers import Tokenizer
 from generator import ConditionalGenerator
+from config import (
+    VOCAB_SIZE, EMBED_DIM, HIDDEN_DIM, NUM_CLASSES,
+    GENERATOR_MODEL, TOKENIZER_CONFIG, 
+    START_TOKEN, USE_CUDA, MAX_SEQ_LEN,
+    NUM_SAMPLES, GENERATION_LABEL_TYPE
+)
 
-def generate_payloads(num_samples=5, label_type=0, max_seq_len=50):
+def generate_payloads(num_samples=None, label_type=None, max_seq_len=None):
     # Configurazione dei parametri del modello
-    vocab_size = 379  # Deve corrispondere al vocabolario usato durante l'addestramento
-    embed_dim = 64
-    hidden_dim = 128
-    num_classes = 3
+    num_samples = num_samples or NUM_SAMPLES
+    label_type = label_type or GENERATION_LABEL_TYPE
+    max_seq_len = max_seq_len or MAX_SEQ_LEN
 
     # Percorsi dei file
-    model_path = "data/models/generator_model.pth"
-    tokenizer_json = "data/bpe_config/sql_bpe_tokenizer_config.json"
+    model_path = GENERATOR_MODEL
+    tokenizer_json = TOKENIZER_CONFIG
 
     # Usa la GPU se disponibile
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -22,11 +27,11 @@ def generate_payloads(num_samples=5, label_type=0, max_seq_len=50):
 
     # Caricamento del modello
     print("Caricamento del Generatore...")
-    generator = ConditionalGenerator(vocab_size, embed_dim, hidden_dim, num_classes)
-    
+    generator = ConditionalGenerator(VOCAB_SIZE, EMBED_DIM, HIDDEN_DIM, NUM_CLASSES)
+
     # Carichiamo i "pesi" salvati durante l'addestramento
     # map_location=device serve per evitare errori se hai addestrato su GPU ma esegui su CPU
-    generator.load_state_dict(torch.load(model_path, map_location=device))
+    generator.load_state_dict(torch.load(GENERATOR_MODEL, map_location=device))
     generator.to(device)
 
     # Impostiamo il modello in modalità "Valutazione/Inferenza" (disabilita il calcolo dei gradienti)
@@ -43,7 +48,7 @@ def generate_payloads(num_samples=5, label_type=0, max_seq_len=50):
         # L'ID 2 corrisponde a [CLS] nel vocabolario BPE
        generated_tokens = generator.sample(
             batch_size=num_samples, 
-            start_token_id=2, 
+            start_token_id=START_TOKEN, 
             labels=labels, 
             max_seq_len=max_seq_len
         ) 

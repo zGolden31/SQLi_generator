@@ -1,5 +1,6 @@
 import pandas as pd
 from tokenizers import Tokenizer, models, trainers, pre_tokenizers, normalizers
+from config import CSV_FILE, BPE_VOCAB_SIZE, BPE_MIN_FREQUENCY, BPE_OUTPUT
 
 def train_bpe_tokenizer(data_path, output_path="data/bpe_config/sql_bpe_tokenizer_config.json"):
     # Usiamo un token [UNK] per gestire i token non visti durante l'addestramento
@@ -22,8 +23,8 @@ def train_bpe_tokenizer(data_path, output_path="data/bpe_config/sql_bpe_tokenize
     # Configurazione del trainer
     # Impostiamo la dimension del vocabolario e i token speciali
     trainer = trainers.BpeTrainer(
-        vocab_size=5000, # Dimensione del vocabolario
-        min_frequency=2, # Frequenza minima per includere un token nel vocabolario
+        vocab_size=BPE_VOCAB_SIZE, # Dimensione del vocabolario
+        min_frequency=BPE_MIN_FREQUENCY, # Frequenza minima per includere un token nel vocabolario
         special_tokens=["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"] # Token speciali
     )
 
@@ -44,7 +45,7 @@ def train_bpe_tokenizer(data_path, output_path="data/bpe_config/sql_bpe_tokenize
     return tokenizer
 
 # Esempio di utilizzo
-data_file = "data/raw/error_based.csv"
-train_bpe_tokenizer(data_file)
+data_file = CSV_FILE
+train_bpe_tokenizer(data_file, BPE_OUTPUT)
 
 
