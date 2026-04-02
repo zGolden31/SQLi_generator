@@ -1,6 +1,7 @@
 import csv                        # Libreria standard per scrivere file CSV
 import torch                      # Framework deep learning principale
 import torch.nn as nn             # Moduli per reti neurali (loss functions, layers)
+import torch.nn.functional as F   # Funzioni senza stato (softmax, log_softmax, ...)
 import torch.optim as optim       # Ottimizzatori (Adam, SGD, ...)
 from pathlib import Path          # Gestione path cross-platform (Windows/Linux/Mac)
 
@@ -92,7 +93,8 @@ def train_cgan():
         "d_loss",       # Loss media del discriminatore nell'epoca
         "reward_mean",  # Reward medio assegnato dal discriminatore ai payload generati
         "d_real_mean",  # P(reale | payload reale): vicino a 1 = D riconosce i reali
-        "d_fake_mean"   # P(reale | payload generato): vicino a 0 = D riconosce i falsi
+        "d_fake_mean",  # P(reale | payload generato): vicino a 0 = D riconosce i falsi
+        "diversity"     # Rapporto token unici / token totali: misura la varietà dei payload generati
     ])
 
     # -----------------------------------------------------------------------
@@ -143,7 +145,7 @@ def train_cgan():
         avg_g = epoch_g_loss / max(n_batches, 1)  # Loss media dell'epoca (max evita divisione per zero)
 
         # Scrive una riga nel CSV: d_loss, reward e metriche D vuote (non applicabili)
-        log_writer.writerow(["pretrain_g", pre_epoch + 1, f"{avg_g:.6f}", "", "", "", ""])
+        log_writer.writerow(["pretrain_g", pre_epoch + 1, f"{avg_g:.6f}", "", "", "", "", ""])
         log_file.flush()  # Forza la scrittura su disco: se il training crasha, i dati sono salvati
 
         print(f"Pre-training G - Epoca {pre_epoch+1}/{PRETRAIN_EPOCHS} completata.")
@@ -202,7 +204,7 @@ def train_cgan():
         avg_d_fake = epoch_d_fake / max(n_batches, 1)
 
         # Scrive una riga nel CSV: g_loss e reward vuoti (non applicabili in questa fase)
-        log_writer.writerow(["pretrain_d", pre_epoch + 1, "", f"{avg_d:.6f}", "", f"{avg_d_real:.4f}", f"{avg_d_fake:.4f}"])
+        log_writer.writerow(["pretrain_d", pre_epoch + 1, "", f"{avg_d:.6f}", "", f"{avg_d_real:.4f}", f"{avg_d_fake:.4f}", ""])
         log_file.flush()
 
         print(f"Pre-training D - Epoca {pre_epoch+1}/{PRETRAIN_EPOCHS} completata.")
@@ -227,12 +229,17 @@ def train_cgan():
     # e varianza ridotta → gradienti più stabili per il generatore
     reward_baseline = 0.5
 
+    # Coefficiente per il bonus di entropia: incoraggia la diversità nei payload generati.
+    # Un valore piccolo (0.01) bilancia reward e diversità senza destabilizzare il training
+    ENTROPY_COEFF = 0.01
+
     for epoch in range(EPOCHS):
         epoch_g_loss = 0.0  # Accumula la policy gradient loss del generatore
         epoch_d_loss = 0.0  # Accumula la BCE loss del discriminatore
         epoch_reward = 0.0  # Accumula il reward medio (sigmoid output del D)
         epoch_d_real = 0.0  # Accumula P(reale | payload reale)
         epoch_d_fake = 0.0  # Accumula P(reale | payload generato)
+        epoch_diversity = 0.0  # Accumula il rapporto token unici / token totali per batch
         n_batches = 0
 
         for batch_idx, (real_data, labels) in enumerate(dataloader):
@@ -261,10 +268,11 @@ def train_cgan():
             # La baseline segue lentamente il reward medio, riducendone la varianza
             reward_baseline = 0.95 * reward_baseline + 0.05 * reward.mean().item()
 
-            # Advantage: reward centrato sulla baseline
-            # Valori positivi → il batch è sopra la media → rinforzare quei token
-            # Valori negativi → il batch è sotto la media → penalizzare quei token
+            # Advantage normalizzato: reward centrato sulla baseline e diviso per la deviazione standard.
+            # La normalizzazione riduce la varianza del gradiente e rende il training più stabile
+            # rispetto al semplice advantage = reward - baseline.
             advantage = reward - reward_baseline
+            advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-8)
 
             # Riallineamento input/target per il calcolo delle log-probabilità:
             # pg_inputs: [START, token_0, ..., token_{T-2}] → input al generatore
@@ -276,8 +284,9 @@ def train_cgan():
             # Forward pass sul generatore per ottenere i logit di ogni token
             logits, _ = generator(pg_inputs, labels)  # (B, T, vocab_size)
 
-            # Converti i logit in log-probabilità normalizzate sul vocabolario
-            log_probs = torch.nn.functional.log_softmax(logits, dim=-1)  # (B, T, vocab_size)
+            # Converti i logit in log-probabilità e probabilità normalizzate sul vocabolario
+            log_probs = F.log_softmax(logits, dim=-1)  # (B, T, vocab_size)
+            probs     = F.softmax(logits, dim=-1)      # (B, T, vocab_size)
 
             # Estrai la log-probabilità del token effettivamente campionato a ogni posizione
             # gather seleziona, per ogni (batch, posizione), il valore all'indice fake_data[b,t]
@@ -289,10 +298,24 @@ def train_cgan():
             # Loss REINFORCE: -E[advantage * log P(token)]
             # advantage.unsqueeze(1): broadcast da (B,) a (B,T) — stesso advantage per tutti i token
             # Il segno negativo converte da gradient ascent (massimizza reward) a gradient descent
-            g_loss = -(advantage.unsqueeze(1) * chosen_log_probs).mean()
+            pg_loss = -(advantage.unsqueeze(1) * chosen_log_probs).mean()
+
+            # Bonus di entropia: -sum(p * log p) — massimizzare l'entropia incoraggia distribuzione
+            # più uniforme sul vocabolario, prevenendo il collasso del generatore su pochi pattern.
+            # Il segno negativo davanti a ENTROPY_COEFF lo converte da bonus a penalità sulla loss.
+            entropy = -(probs * log_probs).sum(dim=-1).mean()
+            g_loss = pg_loss - ENTROPY_COEFF * entropy
 
             g_loss.backward()   # Calcola i gradienti della policy gradient loss
+            nn.utils.clip_grad_norm_(generator.parameters(), GRAD_CLIP)
             g_optimizer.step()  # Aggiorna i pesi del generatore
+
+            # Diversità del batch: rapporto medio tra token unici e token totali per sequenza.
+            # Calcolato per sequenza e poi mediato per riflettere la varietà intra-sequenza.
+            # Valori vicini a 1 indicano alta varietà; valori bassi indicano ripetitività.
+            batch_diversity = sum(
+                row.unique().numel() / row.numel() for row in fake_data
+            ) / fake_data.size(0)
 
             # ---------------------------------------------------------------
             # B. UPDATE DEL DISCRIMINATORE — BCE su reale vs generato
@@ -322,6 +345,7 @@ def train_cgan():
             epoch_reward += reward.mean().item()                       # Reward medio grezzo (pre-baseline)
             epoch_d_real += torch.sigmoid(real_logits).mean().item()  # P(reale|reale): sano se ~0.7
             epoch_d_fake += torch.sigmoid(fake_logits).mean().item()  # P(reale|fake): sano se ~0.3
+            epoch_diversity += batch_diversity                         # Diversità token unici/totali
             n_batches += 1
 
         # Stampa a terminale ogni 5 epoche e all'ultima per non intasare l'output
@@ -329,14 +353,15 @@ def train_cgan():
             print(f"Epoch {epoch}/{EPOCHS} | G Loss: {g_loss.item():.4f} | D Loss: {loss_d.item():.4f}")
 
         # Calcola medie di epoca dividendo per il numero di batch processati
-        avg_g      = epoch_g_loss / max(n_batches, 1)
-        avg_d      = epoch_d_loss / max(n_batches, 1)
-        avg_reward = epoch_reward / max(n_batches, 1)
-        avg_d_real = epoch_d_real / max(n_batches, 1)
-        avg_d_fake = epoch_d_fake / max(n_batches, 1)
+        avg_g         = epoch_g_loss     / max(n_batches, 1)
+        avg_d         = epoch_d_loss     / max(n_batches, 1)
+        avg_reward    = epoch_reward     / max(n_batches, 1)
+        avg_d_real    = epoch_d_real     / max(n_batches, 1)
+        avg_d_fake    = epoch_d_fake     / max(n_batches, 1)
+        avg_diversity = epoch_diversity  / max(n_batches, 1)
 
         # Scrive tutte le metriche dell'epoca avversaria nel CSV
-        log_writer.writerow(["adversarial", epoch, f"{avg_g:.6f}", f"{avg_d:.6f}", f"{avg_reward:.4f}", f"{avg_d_real:.4f}", f"{avg_d_fake:.4f}"])
+        log_writer.writerow(["adversarial", epoch, f"{avg_g:.6f}", f"{avg_d:.6f}", f"{avg_reward:.4f}", f"{avg_d_real:.4f}", f"{avg_d_fake:.4f}", f"{avg_diversity:.4f}"])
         log_file.flush()  # Scrittura immediata su disco
 
     log_file.close()  # Chiude il file CSV al termine del training
