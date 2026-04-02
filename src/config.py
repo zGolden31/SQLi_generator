@@ -53,7 +53,7 @@ DROP_LAST_BATCH = True
 # ==================== GENERATION ====================
 NUM_SAMPLES = 10
 GENERATION_LABEL_TYPE = 0  # 0=error_based, 1=time_based, 2=union_based
-GENERATION_TEMPERATURE = 1.2  # Temperatura aumentata per favorire maggiore diversità nei payload generati
+GENERATION_TEMPERATURE = 0.8  # Lower temperature for more structured, less random generation
 
 # ==================== BPE TOKENIZER ====================
 BPE_VOCAB_SIZE = 5000
